@@ -1,7 +1,6 @@
-import { curves } from '@kit.ArkUI';
 import { common, Want } from '@kit.AbilityKit';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { DividerMode, hdsEffect, hdsMaterial, HdsNavigation, HdsTabs, HdsTabsController } from '@kit.UIDesignKit';
+import { DividerMode, hdsMaterial, HdsNavigation, HdsTabs, HdsTabsController } from '@kit.UIDesignKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 
 import { AppContainer } from '../common/AppContainer';
@@ -199,13 +198,6 @@ struct Index {
     return new RepositoryItemRef('', '', 0);
   }
 
-  private selectTab(index: number): void {
-    if (this.currentTab === index) {
-      return;
-    }
-    this.currentTab = index;
-  }
-
   @Builder
   pageMap(name: string, param: object): void {
     if (name === AppRouteName.RepositoryDetail) {
@@ -248,46 +240,16 @@ struct Index {
         .fontColor([this.currentTab === index
           ? $r('app.color.ag_accent')
           : $r('app.color.ag_text_secondary')])
-        .scale({
-          x: this.currentTab === index ? 1.06 : 1,
-          y: this.currentTab === index ? 1.06 : 1
-        })
-        .animation({ duration: 240, curve: curves.springMotion(0.4, 0.8) })
       Text(spec.label)
         .fontSize(11)
         .fontWeight(this.currentTab === index ? FontWeight.Medium : FontWeight.Regular)
         .fontColor(this.currentTab === index
           ? $r('app.color.ag_accent')
           : $r('app.color.ag_text_secondary'))
-        .animation({ duration: 200, curve: Curve.EaseOut })
     }
     .width('100%')
     .height(56)
     .justifyContent(FlexAlign.Center)
-    .borderRadius(18)
-    .backgroundColor(Color.Transparent)
-    .border({
-      width: this.currentTab === index ? 1 : 0,
-      color: $r('app.color.ag_accent_soft')
-    })
-    .shadow(this.currentTab === index
-      ? { radius: 14, color: $r('app.color.ag_accent_glow'), offsetX: 0, offsetY: 0 }
-      : { radius: 0, color: Color.Transparent, offsetX: 0, offsetY: 0 })
-    .visualEffect(new hdsEffect.HdsEffectBuilder()
-      .pointLight({
-        sourceType: this.currentTab === index
-          ? hdsEffect.PointLightSourceType.BRIGHT : hdsEffect.PointLightSourceType.NONE,
-        illuminatedType: this.currentTab === index
-          ? hdsEffect.PointLightIlluminatedType.BORDER_CONTENT : hdsEffect.PointLightIlluminatedType.NONE,
-        options: {
-          color: $r('app.color.ag_accent'),
-          intensity: this.currentTab === index ? 1.5 : 0,
-          height: 24,
-          bloom: this.currentTab === index ? 1.0 : 0
-        }
-      })
-      .buildEffect())
-    .animation({ duration: 240, curve: curves.springMotion(0.4, 0.8) })
     .id(spec.id)
   }
 
@@ -361,20 +323,6 @@ struct Index {
         .fontColor([this.currentTab === index
           ? $r('app.color.ag_accent')
           : $r('app.color.ag_text_secondary')])
-        .visualEffect(new hdsEffect.HdsEffectBuilder()
-          .pointLight({
-            sourceType: this.currentTab === index
-              ? hdsEffect.PointLightSourceType.BRIGHT : hdsEffect.PointLightSourceType.NONE,
-            illuminatedType: this.currentTab === index
-              ? hdsEffect.PointLightIlluminatedType.BORDER_CONTENT : hdsEffect.PointLightIlluminatedType.NONE,
-            options: {
-              color: $r('app.color.ag_accent'),
-              intensity: this.currentTab === index ? 1.2 : 0,
-              height: 20,
-              bloom: this.currentTab === index ? 0.8 : 0
-            }
-          })
-          .buildEffect())
       Text(spec.label)
         .fontSize(FontSize.body)
         .fontWeight(this.currentTab === index ? FontWeight.Medium : FontWeight.Regular)
@@ -389,13 +337,6 @@ struct Index {
     .padding({ left: Dimens.md, right: Dimens.md })
     .borderRadius(Radius.chip)
     .backgroundColor(Color.Transparent)
-    .border({
-      width: this.currentTab === index ? 1 : 0,
-      color: $r('app.color.ag_accent_soft')
-    })
-    .shadow(this.currentTab === index
-      ? { radius: 14, color: $r('app.color.ag_accent_glow'), offsetX: 0, offsetY: 0 }
-      : { radius: 0, color: Color.Transparent, offsetX: 0, offsetY: 0 })
     .clickEffect({ level: ClickEffectLevel.LIGHT, scale: 0.97 })
     .onClick(() => {
       this.currentTab = index;
@@ -543,6 +484,9 @@ struct Index {
           materialType: this.materialType,
           materialLevel: this.materialLevel
         }
+      })
+      .onTabBarClick((index: number) => {
+        this.currentTab = index;
       })
       .onChange((index: number) => {
         this.currentTab = index;
