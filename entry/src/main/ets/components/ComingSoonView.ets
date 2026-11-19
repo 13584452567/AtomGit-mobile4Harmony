@@ -1,4 +1,5 @@
 import { DisplayMetrics } from '../common/DisplayMetrics';
+import { AppTopBar } from './AppTopBar';
 import { Dimens, Elevation, FontSize, Motion, Radius } from './DesignTokens';
 import { TAB_BAR_CONTENT_INSET } from './NavigationMetrics';
 
@@ -21,7 +22,12 @@ export struct ComingSoonView {
   }
 
   build() {
-    Stack({ alignContent: Alignment.Center }) {
+    Stack({ alignContent: Alignment.Top }) {
+      AppTopBar({
+        title: this.title,
+        scrolled: false
+      })
+      Stack({ alignContent: Alignment.Center }) {
       Circle()
         .width(240)
         .height(240)
@@ -97,13 +103,16 @@ export struct ComingSoonView {
       .shadow({ radius: Elevation.hero, color: $r('app.color.ag_glass_shadow'), offsetX: 0, offsetY: 8 })
       .opacity(this.appeared ? 1 : 0)
       .translate({ y: this.appeared ? 0 : 12 })
+      }
+      .width('100%')
+      .height('100%')
+      .padding({
+        top: this.metrics.topInsetVp + AppTopBar.totalHeight(false),
+        bottom: TAB_BAR_CONTENT_INSET + this.metrics.bottomInsetVp + this.metrics.desktopDockInset() + Dimens.sm
+      })
     }
     .width('100%')
     .height('100%')
-    .padding({
-      top: this.metrics.topInsetVp,
-      bottom: TAB_BAR_CONTENT_INSET + this.metrics.bottomInsetVp + this.metrics.desktopDockInset() + Dimens.sm
-    })
     .linearGradient({
       angle: 180,
       colors: [[$r('app.color.ag_hero_start'), 0], [$r('app.color.ag_background'), 0.55]]

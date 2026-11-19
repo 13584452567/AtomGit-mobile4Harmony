@@ -1,6 +1,7 @@
 import { ActivityPage } from '../../../main/ets/pages/activity/ActivityPage';
 import { LoginPage } from '../../../main/ets/pages/login/LoginPage';
 import { AccountGuard } from '../../../main/ets/security/TokenEnvelope';
+import { RepositoryItemKind, RepositoryItemRef } from '../../../main/ets/model/CollaborationEntities';
 import { ActivityStore } from '../../../main/ets/viewmodel/ActivityStore';
 import { SessionStore } from '../../../main/ets/viewmodel/SessionStore';
 import {
@@ -29,7 +30,8 @@ struct Index {
         ActivityPage({
           store: this.activity,
           session: this.session,
-          onOpenRepo: (owner: string, name: string) => {
+          onOpenTarget: (target: RepositoryItemRef | undefined,
+            kind: RepositoryItemKind | undefined, repository: string) => {
           }
         })
       } else {

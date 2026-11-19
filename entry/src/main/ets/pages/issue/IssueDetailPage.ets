@@ -1,5 +1,15 @@
+import { LengthMetrics } from '@kit.ArkUI';
+import {
+  hdsMaterial,
+  HdsNavDestination,
+  HdsNavDestinationTitleMode,
+  HdsNavigationMenuContentOptions,
+  HdsNavigationMenuItemOptions,
+  ScrollEffectType
+} from '@kit.UIDesignKit';
+
 import { DisplayMetrics } from '../../common/DisplayMetrics';
-import { Dimens, FontSize, Motion, Radius } from '../../components/DesignTokens';
+import { Dimens, FontSize, Radius } from '../../components/DesignTokens';
 import { GlassCard } from '../../components/GlassCard';
 import { EmptyView, ErrorView, LoadingView } from '../../components/StatusViews';
 import {
@@ -21,14 +31,12 @@ export struct IssueDetailPage {
   @Param onOpenWeb: (url: string) => void = () => {};
 
   @Local metrics: DisplayMetrics = DisplayMetrics.instance();
-  @Local appeared: boolean = false;
+
+  private readonly contentScroller: Scroller = new Scroller();
 
   aboutToAppear(): void {
     this.store.initialize(this.ref);
     this.store.load();
-    this.getUIContext().animateTo({ duration: Motion.slow, curve: Curve.Friction }, () => {
-      this.appeared = true;
-    });
   }
 
   aboutToDisappear(): void {
@@ -100,57 +108,30 @@ export struct IssueDetailPage {
     return value.replace(/_/g, ' ');
   }
 
-  @Builder
-  header(): void {
-    Row({ space: Dimens.md }) {
-      Button({ type: ButtonType.Circle }) {
-        SymbolGlyph($r('sys.symbol.arrow_left'))
-          .fontSize(18)
-          .fontColor([$r('app.color.ag_text_primary')])
-      }
-      .width(38)
-      .height(38)
-      .backgroundColor($r('app.color.ag_surface'))
-      .border({ width: 1, color: $r('app.color.ag_card_border') })
-      .onClick(() => {
-        this.onBack();
-      })
-      .id('issue_back')
+  private issueTitle(): string {
+    return 'Issue #' + this.ref.number.toString();
+  }
 
-      Column({ space: 2 }) {
-        Text('Issue #' + this.ref.number.toString())
-          .fontSize(FontSize.headline)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.ag_text_primary'))
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-        Text(this.ref.owner + '/' + this.ref.repo)
-          .fontSize(FontSize.caption)
-          .fontColor($r('app.color.ag_text_tertiary'))
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-      }
-      .layoutWeight(1)
-      .alignItems(HorizontalAlign.Start)
+  private webMenuEnabled(): boolean {
+    return this.store.issue !== undefined && this.store.issue.htmlUrl.length > 0;
+  }
 
-      Button({ type: ButtonType.Circle }) {
-        SymbolGlyph($r('sys.symbol.arrow_up_right'))
-          .fontSize(17)
-          .fontColor([$r('app.color.ag_accent')])
-      }
-      .width(38)
-      .height(38)
-      .backgroundColor($r('app.color.ag_accent_soft'))
-      .enabled(this.store.issue !== undefined && this.store.issue.htmlUrl.length > 0)
-      .onClick(() => {
-        this.openWeb();
-      })
-      .id('issue_open_web')
+  private webMenu(): HdsNavigationMenuContentOptions | undefined {
+    if (!this.webMenuEnabled()) {
+      return undefined;
     }
-    .width('100%')
-    .padding({ left: Dimens.lg, right: Dimens.lg, top: Dimens.md, bottom: Dimens.sm })
-    .opacity(this.appeared ? 1 : 0)
-    .translate({ y: this.appeared ? 0 : 8 })
+    const item: HdsNavigationMenuItemOptions = {
+      content: {
+        icon: $r('sys.symbol.arrow_up_right'),
+        label: 'Open on web',
+        action: (): void => {
+          this.openWeb();
+        }
+      }
+    };
+    const items: HdsNavigationMenuItemOptions[] = [item];
+    const menu: HdsNavigationMenuContentOptions = { value: items, maxCount: 3 };
+    return menu;
   }
 
   @Builder
@@ -426,41 +407,69 @@ export struct IssueDetailPage {
   }
 
   build() {
-    Column() {
-      this.header()
+    HdsNavDestination() {
+      Column() {
+        Blank()
+          .width('100%')
+          .height(this.metrics.topInsetVp + 56)
+        Scroll(this.contentScroller) {
+          Column({ space: Dimens.md }) {
+            this.content()
+          }
+          .width('100%')
+          .padding({ left: Dimens.lg, right: Dimens.lg, bottom: Dimens.md })
+        }
+        .layoutWeight(1)
+        .width('100%')
+        .scrollBar(BarState.Off)
+        .edgeEffect(EdgeEffect.Spring)
+        .onReachEnd(() => {
+          this.loadMore();
+        })
+        .id('issue_detail_scroll')
 
-      Scroll() {
-        Column({ space: Dimens.md }) {
-          this.content()
+        Column() {
+          this.composer()
         }
         .width('100%')
-        .padding({ left: Dimens.lg, right: Dimens.lg, bottom: Dimens.md })
-      }
-      .layoutWeight(1)
-      .width('100%')
-      .scrollBar(BarState.Off)
-      .edgeEffect(EdgeEffect.Spring)
-      .onReachEnd(() => {
-        this.loadMore();
-      })
-      .id('issue_detail_scroll')
-
-      Column() {
-        this.composer()
+        .padding({ left: Dimens.lg, right: Dimens.lg, bottom: Dimens.sm })
       }
       .width('100%')
-      .padding({ left: Dimens.lg, right: Dimens.lg, bottom: Dimens.sm })
+      .height('100%')
+      .backgroundColor($r('app.color.ag_background'))
     }
+    .titleBar({
+      avoidLayoutSafeArea: true,
+      style: {
+        scrollEffectOpts: {
+          enableScrollEffect: true,
+          scrollEffectType: ScrollEffectType.GRADIENT_BLUR,
+          blurEffectiveStartOffset: LengthMetrics.vp(0),
+          blurEffectiveEndOffset: LengthMetrics.vp(0)
+        },
+        systemMaterialEffect: {
+          materialType: hdsMaterial.MaterialType.IMMERSIVE,
+          materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
+        }
+      },
+      content: {
+        title: {
+          mainTitle: this.issueTitle(),
+          subTitle: this.ref.owner + '/' + this.ref.repo,
+          mainTitleId: 'issue_title'
+        },
+        menu: this.webMenu()
+      }
+    })
+    .titleMode(HdsNavDestinationTitleMode.MINI)
+    .bindToScrollable([this.contentScroller])
+    .onBackPressed(() => {
+      this.onBack();
+      return true;
+    })
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     .width('100%')
     .height('100%')
-    .padding({
-      top: this.metrics.topInsetVp,
-      bottom: this.metrics.bottomInsetVp
-    })
-    .linearGradient({
-      angle: 180,
-      colors: [[$r('app.color.ag_hero_start'), 0], [$r('app.color.ag_background'), 0.45]]
-    })
     .id('issue_detail_page')
   }
 }
