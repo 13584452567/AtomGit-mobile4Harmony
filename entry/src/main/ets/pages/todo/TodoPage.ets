@@ -5,6 +5,7 @@ import { EmptyTodoStore, TodoCategory, TodoScope, TodoStore, scopesForCategory }
 import { SessionStore } from '../../viewmodel/SessionStore';
 import { RepositoryItemKind, WorkItem } from '../../model/CollaborationEntities';
 import { Dimens, FontSize, Motion, Radius } from '../../components/DesignTokens';
+import { AppTopBar, AppTopBarAction } from '../../components/AppTopBar';
 import { TAB_BAR_CONTENT_INSET } from '../../components/NavigationMetrics';
 import { EmptyView, ErrorView } from '../../components/StatusViews';
 import { GlassCard } from '../../components/GlassCard';
@@ -16,9 +17,31 @@ export struct TodoPage {
   @Param onOpenItem: (workItem: WorkItem) => void = () => {};
 
   @Local category: TodoCategory = TodoCategory.Pending;
-  @Local refreshing: boolean = false;
   @Local metrics: DisplayMetrics = DisplayMetrics.instance();
   @Local appeared: boolean = false;
+  @Local barScrolled: boolean = false;
+
+  private topBarActions(): AppTopBarAction[] {
+    const refresh: AppTopBarAction = new AppTopBarAction(
+      $r('sys.symbol.arrow_clockwise'), 'refresh');
+    const actions: AppTopBarAction[] = [refresh];
+    return actions;
+  }
+
+  private handleBarAction(index: number): void {
+    if (index === 0) {
+      this.refresh();
+    }
+  }
+
+  private handleSegmentSelect(index: number): void {
+    this.category = index === 0 ? TodoCategory.Pending : TodoCategory.Created;
+  }
+
+  private segmentLabels(): string[] {
+    const labels: string[] = ['To handle', 'Created by me'];
+    return labels;
+  }
 
   aboutToAppear(): void {
     this.getUIContext().animateTo({ duration: Motion.slow, curve: Curve.Friction }, () => {
@@ -45,9 +68,7 @@ export struct TodoPage {
   }
 
   private async refresh(): Promise<void> {
-    this.refreshing = true;
     await this.store.refresh();
-    this.refreshing = false;
   }
 
   private async loadMoreAtEnd(): Promise<void> {
@@ -129,71 +150,6 @@ export struct TodoPage {
 
   private pad(value: number): string {
     return value < 10 ? '0' + value.toString() : value.toString();
-  }
-
-  @Builder
-  categoryTab(category: TodoCategory): void {
-    Column({ space: 2 }) {
-      Text(this.categoryLabel(category))
-        .fontSize(FontSize.body)
-        .fontWeight(this.category === category ? FontWeight.Medium : FontWeight.Regular)
-        .fontColor(this.category === category
-          ? $r('app.color.ag_text_on_accent') : $r('app.color.ag_text_secondary'))
-      Text(this.store.categoryLoadedCount(category).toString() + ' loaded')
-        .fontSize(10)
-        .fontColor(this.category === category
-          ? $r('app.color.ag_text_on_accent') : $r('app.color.ag_text_tertiary'))
-    }
-    .layoutWeight(1)
-    .padding({ top: Dimens.sm, bottom: Dimens.sm })
-    .borderRadius(Radius.chip)
-    .backgroundColor(this.category === category ? $r('app.color.ag_accent') : Color.Transparent)
-    .clickEffect({ level: ClickEffectLevel.LIGHT, scale: 0.97 })
-    .onClick(() => {
-      this.category = category;
-    })
-    .id('todo_category_' + category)
-  }
-
-  @Builder
-  header(): void {
-    Column({ space: Dimens.md }) {
-      Row({ space: Dimens.md }) {
-        Column({ space: 2 }) {
-          Text('Todo workspace')
-            .fontSize(FontSize.headline)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.ag_text_primary'))
-          Text(this.session.user === undefined ? '' : '@' + this.session.user.login)
-            .fontSize(FontSize.caption)
-            .fontColor($r('app.color.ag_text_tertiary'))
-        }
-        .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start)
-
-        Text(this.store.categoryLoadedCount(this.category).toString() + ' loaded')
-          .fontSize(FontSize.caption)
-          .fontColor($r('app.color.ag_text_secondary'))
-          .padding({ left: Dimens.sm, right: Dimens.sm, top: 5, bottom: 5 })
-          .borderRadius(Radius.chip)
-          .backgroundColor($r('app.color.ag_accent_soft'))
-      }
-      .width('100%')
-      .alignItems(VerticalAlign.Center)
-
-      Row({ space: Dimens.xs }) {
-        this.categoryTab(TodoCategory.Pending)
-        this.categoryTab(TodoCategory.Created)
-      }
-      .width('100%')
-      .padding(Dimens.xs)
-      .borderRadius(Radius.chip)
-      .backgroundColor($r('app.color.ag_surface'))
-      .border({ width: 1, color: $r('app.color.ag_card_border') })
-    }
-    .width('100%')
-    .alignItems(HorizontalAlign.Start)
-    .padding({ left: Dimens.lg, right: Dimens.lg, top: Dimens.md, bottom: Dimens.md })
   }
 
   @Builder
@@ -404,54 +360,73 @@ export struct TodoPage {
   }
 
   build() {
-    Column() {
-      this.header()
-
-      Refresh({ refreshing: this.refreshing }) {
-        List({ space: Dimens.md }) {
-          ListItem() {
-            this.partialFailureNotice()
-          }
-
-          ForEach(scopesForCategory(this.category), (scope: TodoScope) => {
-            ListItem() {
-              this.scopeSection(scope)
-            }
-          }, (scope: TodoScope) => scope)
-
-          ListItem() {
-            Text('Counts show only items loaded on this device.')
-              .fontSize(10)
-              .fontColor($r('app.color.ag_text_tertiary'))
+    Stack({ alignContent: Alignment.Top }) {
+      List({ space: Dimens.md }) {
+        ListItem() {
+          Column() {
+            Blank()
               .width('100%')
-              .textAlign(TextAlign.Center)
-              .padding({ top: Dimens.sm, bottom: Dimens.xl })
+              .height(this.metrics.topInsetVp + AppTopBar.totalHeight(true) + Dimens.sm)
           }
+          .width('100%')
         }
-        .width('100%')
-        .height('100%')
-        .padding({ left: Dimens.lg, right: Dimens.lg, bottom: Dimens.md })
-        .scrollBar(BarState.Off)
-        .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
-        .onReachEnd(() => {
-          this.loadMoreAtEnd();
+
+        ListItem() {
+          this.partialFailureNotice()
+        }
+
+        ForEach(scopesForCategory(this.category), (scope: TodoScope) => {
+          ListItem() {
+            this.scopeSection(scope)
+          }
+        }, (scope: TodoScope) => scope)
+
+        ListItem() {
+          Text('Counts show only items loaded on this device.')
+            .fontSize(10)
+            .fontColor($r('app.color.ag_text_tertiary'))
+            .width('100%')
+            .textAlign(TextAlign.Center)
+            .padding({ top: Dimens.sm, bottom: Dimens.xl })
+        }
+        .margin({
+          bottom: TAB_BAR_CONTENT_INSET + this.metrics.bottomInsetVp
+            + this.metrics.desktopDockInset() + Dimens.sm
         })
-        .id('todo_list')
       }
-      .layoutWeight(1)
       .width('100%')
-      .onRefreshing(() => {
-        this.refresh();
+      .height('100%')
+      .padding({ left: Dimens.lg, right: Dimens.lg })
+      .scrollBar(BarState.Off)
+      .edgeEffect(EdgeEffect.Spring)
+      .onReachEnd(() => {
+        this.loadMoreAtEnd();
       })
-      .id('todo_refresh_container')
+      .onScrollIndex((_start: number, _end: number, offset: number) => {
+        const next: boolean = offset > 8;
+        if (next !== this.barScrolled) {
+          this.barScrolled = next;
+        }
+      })
+      .id('todo_list')
+
+      AppTopBar({
+        title: '待办',
+        subtitle: this.session.user === undefined ? '' : '@' + this.session.user.login,
+        actions: this.topBarActions(),
+        segments: this.segmentLabels(),
+        segmentIndex: this.category === TodoCategory.Pending ? 0 : 1,
+        scrolled: this.barScrolled,
+        onSegmentSelect: (index: number): void => {
+          this.handleSegmentSelect(index);
+        },
+        onAction: (index: number): void => {
+          this.handleBarAction(index);
+        }
+      })
     }
     .width('100%')
     .height('100%')
-    .padding({
-      top: this.metrics.topInsetVp,
-      bottom: TAB_BAR_CONTENT_INSET + this.metrics.bottomInsetVp
-        + this.metrics.desktopDockInset() + Dimens.sm
-    })
     .linearGradient({
       angle: 180,
       colors: [[$r('app.color.ag_hero_start'), 0], [$r('app.color.ag_background'), 0.45]]

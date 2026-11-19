@@ -1,4 +1,5 @@
 import { ApiError, ApiErrorKind } from '../common/ApiError';
+import { CancellationSignal } from '../common/Cancellation';
 import { CancelToken } from '../network/HttpClient';
 import { OffsetPageRequest, Page, PageRequest } from '../common/Pager';
 import {
@@ -22,7 +23,9 @@ class EmptyIssueRepository implements IssueRepository {
     return Page.empty<CollaborationComment>(request);
   }
 
-  async addIssueComment(ref: RepositoryItemRef, body: string): Promise<void> {
+  async addIssueComment(ref: RepositoryItemRef, body: string,
+    cancel?: CancellationSignal): Promise<string> {
+    return '';
   }
 }
 

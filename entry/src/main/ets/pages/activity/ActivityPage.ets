@@ -16,6 +16,7 @@ import {
 import { ActivityItem, RepositoryItemKind, RepositoryItemRef } from '../../model/CollaborationEntities';
 import { RepoSummary } from '../../model/Entities';
 import { Dimens, FontSize, Motion, Radius } from '../../components/DesignTokens';
+import { AppTopBar, AppTopBarAction } from '../../components/AppTopBar';
 import { TAB_BAR_CONTENT_INSET } from '../../components/NavigationMetrics';
 import { EmptyView, ErrorView } from '../../components/StatusViews';
 
@@ -26,9 +27,35 @@ export struct ActivityPage {
   @Param onOpenTarget: (target: RepositoryItemRef | undefined,
     kind: RepositoryItemKind | undefined, repository: string) => void = () => {};
 
-  @Local refreshing: boolean = false;
   @Local metrics: DisplayMetrics = DisplayMetrics.instance();
   @Local appeared: boolean = false;
+  @Local barScrolled: boolean = false;
+
+  private topBarActions(): AppTopBarAction[] {
+    const refresh: AppTopBarAction = new AppTopBarAction(
+      $r('sys.symbol.arrow_clockwise'), 'refresh');
+    const actions: AppTopBarAction[] = [refresh];
+    return actions;
+  }
+
+  private handleBarAction(index: number): void {
+    if (index === 0) {
+      this.refresh();
+    }
+  }
+
+  private handleSegmentSelect(index: number): void {
+    if (index === 0) {
+      this.openPersonal();
+    } else {
+      this.openProjects();
+    }
+  }
+
+  private segmentLabels(): string[] {
+    const labels: string[] = ['Mine', 'Projects'];
+    return labels;
+  }
 
   aboutToAppear(): void {
     this.getUIContext().animateTo({ duration: Motion.slow, curve: Curve.Friction }, () => {
@@ -86,9 +113,7 @@ export struct ActivityPage {
   }
 
   private async refresh(): Promise<void> {
-    this.refreshing = true;
     await this.store.refresh();
-    this.refreshing = false;
   }
 
   private async loadMore(): Promise<void> {
@@ -120,76 +145,8 @@ export struct ActivityPage {
   }
 
   @Builder
-  sourceTab(source: ActivitySource, label: string): void {
-    Text(label)
-      .fontSize(FontSize.body)
-      .fontWeight(this.store.source === source ? FontWeight.Medium : FontWeight.Regular)
-      .fontColor(this.store.source === source
-        ? $r('app.color.ag_text_on_accent')
-        : $r('app.color.ag_text_secondary'))
-      .textAlign(TextAlign.Center)
-      .layoutWeight(1)
-      .padding({ top: Dimens.sm, bottom: Dimens.sm })
-      .borderRadius(Radius.chip)
-      .backgroundColor(this.store.source === source
-        ? $r('app.color.ag_accent')
-        : Color.Transparent)
-      .clickEffect({ level: ClickEffectLevel.LIGHT, scale: 0.97 })
-      .onClick(() => {
-        if (source === ActivitySource.Personal) {
-          this.openPersonal();
-        } else {
-          this.openProjects();
-        }
-      })
-      .id(source === ActivitySource.Personal ? 'activity_source_personal' : 'activity_source_projects')
-  }
-
-  @Builder
   header(): void {
     Column({ space: Dimens.md }) {
-      Row({ space: Dimens.md }) {
-        Column({ space: 2 }) {
-          Text('Activity')
-            .fontSize(FontSize.headline)
-            .fontWeight(FontWeight.Bold)
-            .fontColor($r('app.color.ag_text_primary'))
-          Text(this.session.user === undefined ? '' : '@' + this.session.user.login)
-            .fontSize(FontSize.caption)
-            .fontColor($r('app.color.ag_text_tertiary'))
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-        .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start)
-
-        Button({ type: ButtonType.Circle }) {
-          SymbolGlyph($r('sys.symbol.arrow_up_right'))
-            .fontSize(17)
-            .fontColor([$r('app.color.ag_accent')])
-            .rotate({ angle: -45 })
-        }
-        .width(38)
-        .height(38)
-        .backgroundColor($r('app.color.ag_accent_soft'))
-        .onClick(() => {
-          this.refresh();
-        })
-        .enabled(this.store.state !== LoadState.Loading
-          && this.store.state !== LoadState.Refreshing)
-        .id('activity_refresh')
-      }
-      .width('100%')
-
-      Row() {
-        this.sourceTab(ActivitySource.Personal, 'Mine')
-        this.sourceTab(ActivitySource.Project, 'Projects')
-      }
-      .width('100%')
-      .padding(3)
-      .borderRadius(Radius.chip + 2)
-      .backgroundColor($r('app.color.ag_chip_bg'))
-
       if (this.store.source === ActivitySource.Project && this.store.projects.length > 0) {
         List({ space: Dimens.sm }) {
           ForEach(this.store.projects, (repo: RepoSummary) => {
@@ -244,7 +201,7 @@ export struct ActivityPage {
       .width('100%')
     }
     .width('100%')
-    .padding({ left: Dimens.lg, right: Dimens.lg, top: Dimens.md, bottom: Dimens.sm })
+    .padding({ top: Dimens.md, bottom: Dimens.sm })
     .opacity(this.appeared ? 1 : 0)
     .translate({ y: this.appeared ? 0 : 8 })
   }
@@ -454,41 +411,56 @@ export struct ActivityPage {
             .id('activity_end')
         }
       }
+      .margin({
+        bottom: TAB_BAR_CONTENT_INSET + this.metrics.bottomInsetVp
+          + this.metrics.desktopDockInset() + Dimens.sm
+      })
     }
   }
 
   build() {
-    Column() {
-      this.header()
-
-      Refresh({ refreshing: this.refreshing }) {
-        List() {
-          this.feedItems()
+    Stack({ alignContent: Alignment.Top }) {
+      List() {
+        ListItem() {
+          this.header()
         }
-        .width('100%')
-        .height('100%')
-        .padding({ left: Dimens.lg, right: Dimens.lg, bottom: Dimens.md })
-        .scrollBar(BarState.Off)
-        .edgeEffect(EdgeEffect.Spring, { alwaysEnabled: true })
-        .onReachEnd(() => {
-          this.loadMore();
-        })
-        .id('activity_list')
+        .margin({ top: this.metrics.topInsetVp + AppTopBar.totalHeight(true) + Dimens.sm })
+
+        this.feedItems()
       }
-      .layoutWeight(1)
       .width('100%')
-      .onRefreshing(() => {
-        this.refresh();
+      .height('100%')
+      .padding({ left: Dimens.lg, right: Dimens.lg })
+      .scrollBar(BarState.Off)
+      .edgeEffect(EdgeEffect.Spring)
+      .onReachEnd(() => {
+        this.loadMore();
       })
-      .id('activity_refresh_container')
+      .onScrollIndex((_start: number, _end: number, offset: number) => {
+        const next: boolean = offset > 8;
+        if (next !== this.barScrolled) {
+          this.barScrolled = next;
+        }
+      })
+      .id('activity_list')
+
+      AppTopBar({
+        title: '动态',
+        subtitle: this.session.user === undefined ? '' : '@' + this.session.user.login,
+        actions: this.topBarActions(),
+        segments: this.segmentLabels(),
+        segmentIndex: this.store.source === ActivitySource.Personal ? 0 : 1,
+        scrolled: this.barScrolled,
+        onSegmentSelect: (index: number): void => {
+          this.handleSegmentSelect(index);
+        },
+        onAction: (index: number): void => {
+          this.handleBarAction(index);
+        }
+      })
     }
     .width('100%')
     .height('100%')
-    .padding({
-      top: this.metrics.topInsetVp,
-      bottom: TAB_BAR_CONTENT_INSET + this.metrics.bottomInsetVp
-        + this.metrics.desktopDockInset() + Dimens.sm
-    })
     .linearGradient({
       angle: 180,
       colors: [[$r('app.color.ag_hero_start'), 0], [$r('app.color.ag_background'), 0.45]]

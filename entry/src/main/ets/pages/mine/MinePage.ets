@@ -11,6 +11,7 @@ import { EmptySessionStore } from '../../viewmodel/EmptySessionStore';
 import { LoadState, SessionStore } from '../../viewmodel/SessionStore';
 import { OrgSummary, RepoSummary } from '../../model/Entities';
 import { Dimens, FontSize, Motion, Radius } from '../../components/DesignTokens';
+import { AppTopBar } from '../../components/AppTopBar';
 import { EmptyView, ErrorView } from '../../components/StatusViews';
 import { TAB_BAR_CONTENT_INSET } from '../../components/NavigationMetrics';
 
@@ -22,6 +23,7 @@ export struct MinePage {
   @Local loggingOut: boolean = false;
   @Local metrics: DisplayMetrics = DisplayMetrics.instance();
   @Local appeared: boolean = false;
+  @Local barScrolled: boolean = false;
 
   aboutToAppear(): void {
     this.getUIContext().animateTo({ duration: Motion.slow, curve: Curve.Friction }, () => {
@@ -310,7 +312,7 @@ export struct MinePage {
         ListItem() {
           this.hero()
         }
-        .margin({ top: this.metrics.topInsetVp + Dimens.sm })
+        .margin({ top: this.metrics.topInsetVp + AppTopBar.totalHeight(false) + Dimens.sm })
 
         if (this.session.errorMessage.length > 0) {
           ListItem() {
@@ -389,8 +391,19 @@ export struct MinePage {
           this.session.loadRepos();
         }
       })
+      .onScrollIndex((_start: number, _end: number, offset: number) => {
+        const next: boolean = offset > 8;
+        if (next !== this.barScrolled) {
+          this.barScrolled = next;
+        }
+      })
       .id('mine_repos_list')
       .backgroundColor($r('app.color.ag_background'))
+
+      AppTopBar({
+        title: '我的',
+        scrolled: this.barScrolled
+      })
     }
     .width('100%')
     .height('100%')

@@ -101,6 +101,10 @@
       "value": "#66000000"
     },
     {
+      "name": "ag_topbar_glass",
+      "value": "#B3161B24"
+    },
+    {
       "name": "ag_nav_shadow",
       "value": "#80000000"
     },

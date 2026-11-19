@@ -1,3 +1,14 @@
+import { LengthMetrics } from '@kit.ArkUI';
+import {
+  hdsMaterial,
+  HdsNavDestination,
+  HdsNavDestinationTitleMode,
+  HdsNavigationMenuContentOptions,
+  HdsNavigationMenuItemOptions,
+  ScrollEffectType
+} from '@kit.UIDesignKit';
+
+import { DisplayMetrics } from '../../common/DisplayMetrics';
 import { Dimens, FontSize, Radius } from '../../components/DesignTokens';
 import { GlassCard } from '../../components/GlassCard';
 import { EmptyView, ErrorView, LoadingView } from '../../components/StatusViews';
@@ -22,6 +33,37 @@ export struct PullRequestDetailPage {
   @Param onOpenWeb: (url: string) => void = () => {};
 
   @Local selectedFileIndex: number = 0;
+  @Local metrics: DisplayMetrics = DisplayMetrics.instance();
+
+  private readonly contentScroller: Scroller = new Scroller();
+
+  private pageTitle(): string {
+    return 'Pull request #' + this.ref.number.toString();
+  }
+
+  private webOpenEnabled(): boolean {
+    return this.store.detail !== undefined && this.store.detail.htmlUrl.length > 0;
+  }
+
+  private webMenu(): HdsNavigationMenuContentOptions | undefined {
+    if (!this.webOpenEnabled()) {
+      return undefined;
+    }
+    const item: HdsNavigationMenuItemOptions = {
+      content: {
+        icon: $r('sys.symbol.arrow_up_right'),
+        label: 'Open on web',
+        action: (): void => {
+          if (this.store.detail !== undefined && this.store.detail.htmlUrl.length > 0) {
+            this.onOpenWeb(this.store.detail.htmlUrl);
+          }
+        }
+      }
+    };
+    const items: HdsNavigationMenuItemOptions[] = [item];
+    const menu: HdsNavigationMenuContentOptions = { value: items, maxCount: 3 };
+    return menu;
+  }
 
   aboutToAppear(): void {
     this.store.open(this.ref).then(() => {
@@ -120,10 +162,6 @@ export struct PullRequestDetailPage {
     return 'Patch unavailable for this file. Open the pull request on the web to inspect the change.';
   }
 
-  private prLabel(detail: PullRequestDetail): string {
-    return detail.ref.owner + '/' + detail.ref.repo + '#' + detail.ref.number.toString();
-  }
-
   private approvalDescription(detail: PullRequestDetail): string {
     if (detail.merged) {
       return 'This pull request is already merged.';
@@ -146,56 +184,6 @@ export struct PullRequestDetailPage {
       parts.push('Resolved');
     }
     return parts.join(' · ');
-  }
-
-  @Builder
-  pageHeader(): void {
-    Row({ space: Dimens.md }) {
-      Button({ type: ButtonType.Circle }) {
-        SymbolGlyph($r('sys.symbol.chevron_left'))
-          .fontSize(20)
-          .fontColor([$r('app.color.ag_text_primary')])
-      }
-      .width(40)
-      .height(40)
-      .backgroundColor($r('app.color.ag_surface'))
-      .border({ width: 1, color: $r('app.color.ag_card_border') })
-      .onClick(() => {
-        this.onBack();
-      })
-      .id('pr_detail_back')
-
-      Column({ space: 2 }) {
-        Text('Pull request')
-          .fontSize(FontSize.headline)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('app.color.ag_text_primary'))
-        Text(this.store.detail === undefined
-          ? this.ref.owner + '/' + this.ref.repo + '#' + this.ref.number.toString()
-          : this.prLabel(this.store.detail))
-          .fontSize(FontSize.caption)
-          .fontColor($r('app.color.ag_text_tertiary'))
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-      }
-      .layoutWeight(1)
-      .alignItems(HorizontalAlign.Start)
-
-      Button('Open on web')
-        .height(36)
-        .fontSize(FontSize.caption)
-        .fontColor($r('app.color.ag_accent'))
-        .backgroundColor($r('app.color.ag_accent_soft'))
-        .enabled(this.store.detail !== undefined && this.store.detail.htmlUrl.length > 0)
-        .onClick(() => {
-          if (this.store.detail !== undefined && this.store.detail.htmlUrl.length > 0) {
-            this.onOpenWeb(this.store.detail.htmlUrl);
-          }
-        })
-        .id('pr_detail_open_web')
-    }
-    .width('100%')
-    .padding({ left: Dimens.lg, right: Dimens.lg, top: Dimens.md, bottom: Dimens.sm })
   }
 
   @Builder
@@ -735,69 +723,101 @@ export struct PullRequestDetailPage {
   }
 
   build() {
-    Column() {
-      this.pageHeader()
-
-      if (this.store.loadingDetail && this.store.detail === undefined) {
-        LoadingView({ text: 'Loading pull request details' })
-      } else if (this.store.detail === undefined) {
-        Column({ space: Dimens.sm }) {
-          ErrorView({
-            message: this.store.detailErrorMessage.length > 0
-              ? this.store.detailErrorMessage : 'The pull request could not be loaded.',
-            retryable: false,
-            viewId: 'pr_detail_error'
-          })
-          Button('Retry pull request')
-            .height(36)
-            .fontSize(FontSize.caption)
-            .fontColor($r('app.color.ag_accent'))
-            .backgroundColor($r('app.color.ag_accent_soft'))
-            .onClick(() => {
-              this.store.refreshAll();
+    HdsNavDestination() {
+      Column() {
+        Blank()
+          .width('100%')
+          .height(this.metrics.topInsetVp + 56)
+        if (this.store.loadingDetail && this.store.detail === undefined) {
+          LoadingView({ text: 'Loading pull request details' })
+        } else if (this.store.detail === undefined) {
+          Column({ space: Dimens.sm }) {
+            ErrorView({
+              message: this.store.detailErrorMessage.length > 0
+                ? this.store.detailErrorMessage : 'The pull request could not be loaded.',
+              retryable: false,
+              viewId: 'pr_detail_error'
             })
-        }
-        .width('100%')
-        .padding(Dimens.lg)
-      } else {
-        Refresh({ refreshing: this.store.refreshing }) {
-          Scroll() {
-            Column({ space: Dimens.md }) {
-              if (this.store.detailErrorMessage.length > 0) {
-                ErrorView({
-                  message: this.store.detailErrorMessage,
-                  retryable: false,
-                  fontSize: FontSize.caption,
-                  padH: 0,
-                  padV: 0,
-                  viewId: 'pr_detail_partial_error'
-                })
-              }
-              this.detailContent(this.store.detail)
-            }
-            .width('100%')
-            .padding({ left: Dimens.lg, right: Dimens.lg, bottom: Dimens.xxl })
+            Button('Retry pull request')
+              .height(36)
+              .fontSize(FontSize.caption)
+              .fontColor($r('app.color.ag_accent'))
+              .backgroundColor($r('app.color.ag_accent_soft'))
+              .onClick(() => {
+                this.store.refreshAll();
+              })
           }
           .width('100%')
-          .height('100%')
-          .scrollBar(BarState.Off)
-          .edgeEffect(EdgeEffect.Spring)
-          .id('pr_detail_scroll')
+          .padding(Dimens.lg)
+        } else {
+          Refresh({ refreshing: this.store.refreshing }) {
+            Scroll(this.contentScroller) {
+              Column({ space: Dimens.md }) {
+                if (this.store.detailErrorMessage.length > 0) {
+                  ErrorView({
+                    message: this.store.detailErrorMessage,
+                    retryable: false,
+                    fontSize: FontSize.caption,
+                    padH: 0,
+                    padV: 0,
+                    viewId: 'pr_detail_partial_error'
+                  })
+                }
+                this.detailContent(this.store.detail)
+              }
+              .width('100%')
+              .padding({ left: Dimens.lg, right: Dimens.lg, bottom: Dimens.xxl })
+            }
+            .width('100%')
+            .height('100%')
+            .scrollBar(BarState.Off)
+            .edgeEffect(EdgeEffect.Spring)
+            .id('pr_detail_scroll')
+          }
+          .layoutWeight(1)
+          .width('100%')
+          .onRefreshing(() => {
+            this.store.refreshAll();
+          })
+          .id('pr_detail_refresh')
         }
-        .layoutWeight(1)
-        .width('100%')
-        .onRefreshing(() => {
-          this.store.refreshAll();
-        })
-        .id('pr_detail_refresh')
       }
+      .width('100%')
+      .height('100%')
+      .backgroundColor($r('app.color.ag_background'))
     }
+    .titleBar({
+      avoidLayoutSafeArea: true,
+      style: {
+        scrollEffectOpts: {
+          enableScrollEffect: true,
+          scrollEffectType: ScrollEffectType.GRADIENT_BLUR,
+          blurEffectiveStartOffset: LengthMetrics.vp(0),
+          blurEffectiveEndOffset: LengthMetrics.vp(0)
+        },
+        systemMaterialEffect: {
+          materialType: hdsMaterial.MaterialType.IMMERSIVE,
+          materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
+        }
+      },
+      content: {
+        title: {
+          mainTitle: this.pageTitle(),
+          subTitle: this.ref.owner + '/' + this.ref.repo,
+          mainTitleId: 'pr_title'
+        },
+        menu: this.webMenu()
+      }
+    })
+    .titleMode(HdsNavDestinationTitleMode.MINI)
+    .bindToScrollable([this.contentScroller])
+    .onBackPressed(() => {
+      this.onBack();
+      return true;
+    })
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     .width('100%')
     .height('100%')
-    .linearGradient({
-      angle: 180,
-      colors: [[$r('app.color.ag_hero_start'), 0], [$r('app.color.ag_background'), 0.4]]
-    })
     .id('pr_detail_page')
   }
 }
